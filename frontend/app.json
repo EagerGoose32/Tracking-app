@@ -15,6 +15,7 @@
       }
     },
     "android": {
+      "package": "com.substancetracker.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000"
