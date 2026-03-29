@@ -1,8 +1,34 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect, useState } from 'react';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { initDatabase } from '../services/database';
 
 export default function TabLayout() {
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    const setupDatabase = async () => {
+      try {
+        await initDatabase();
+        setIsReady(true);
+      } catch (error) {
+        console.error('Failed to initialize database:', error);
+      }
+    };
+
+    setupDatabase();
+  }, []);
+
+  if (!isReady) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator size="large" color="#8B5CF6" />
+      </View>
+    );
+  }
+
   return (
     <>
       <StatusBar style="light" />
@@ -71,3 +97,13 @@ export default function TabLayout() {
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  loading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#111827',
+  },
+});
+

@@ -11,28 +11,23 @@ import {
 import { useFocusEffect } from 'expo-router';
 import { startOfWeek, addDays, format, isSameDay, parseISO } from 'date-fns';
 import { Ionicons } from '@expo/vector-icons';
-
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+import { getAllEntries, getStats } from '../services/database';
 
 export default function HomeScreen() {
-  const [entries, setEntries] = useState([]);
+  const [entries, setEntries] = useState<any[]>([]);
   const [currentWeekStart, setCurrentWeekStart] = useState(
     startOfWeek(new Date(), { weekStartsOn: 1 })
   );
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState<any>(null);
 
   const fetchData = async () => {
     try {
-      // Fetch entries
-      const entriesRes = await fetch(`${BACKEND_URL}/api/entries`);
-      const entriesData = await entriesRes.json();
+      const entriesData = await getAllEntries();
       setEntries(entriesData);
 
-      // Fetch stats
-      const statsRes = await fetch(`${BACKEND_URL}/api/stats`);
-      const statsData = await statsRes.json();
+      const statsData = await getStats();
       setStats(statsData);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -68,7 +63,7 @@ export default function HomeScreen() {
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
 
-  const hasEntryOnDay = (date) => {
+  const hasEntryOnDay = (date: Date) => {
     return entries.some((entry) => {
       try {
         const entryDate = parseISO(entry.date);
@@ -79,7 +74,7 @@ export default function HomeScreen() {
     });
   };
 
-  const getEntriesForDay = (date) => {
+  const getEntriesForDay = (date: Date) => {
     return entries.filter((entry) => {
       try {
         const entryDate = parseISO(entry.date);
@@ -119,7 +114,7 @@ export default function HomeScreen() {
     >
       <View style={styles.header}>
         <Text style={styles.title}>Substance Tracker</Text>
-        <Text style={styles.subtitle}>Track your usage and build better habits</Text>
+        <Text style={styles.subtitle}>Track your usage and build better habits • Offline Mode</Text>
       </View>
 
       {/* Week Navigation */}
