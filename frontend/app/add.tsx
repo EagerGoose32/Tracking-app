@@ -22,6 +22,7 @@ export default function AddScreen() {
   const router = useRouter();
   const [substances, setSubstances] = useState([]);
   const [selectedSubstance, setSelectedSubstance] = useState(null);
+  const [substanceName, setSubstanceName] = useState('');
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [time, setTime] = useState(format(new Date(), 'HH:mm'));
   const [amount, setAmount] = useState('');
@@ -47,8 +48,10 @@ export default function AddScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!selectedSubstance) {
-      Alert.alert('Error', 'Please select a substance');
+    const finalSubstanceName = substanceName.trim() || selectedSubstance?.name;
+    
+    if (!finalSubstanceName) {
+      Alert.alert('Error', 'Please select a substance or enter a name');
       return;
     }
     if (!amount || parseFloat(amount) <= 0) {
@@ -59,8 +62,8 @@ export default function AddScreen() {
     setLoading(true);
     try {
       const entry = {
-        substanceId: selectedSubstance.id,
-        substanceName: selectedSubstance.name,
+        substanceId: selectedSubstance?.id || 'custom',
+        substanceName: finalSubstanceName,
         date,
         time,
         amount: parseFloat(amount),
@@ -86,6 +89,7 @@ export default function AddScreen() {
             onPress: () => {
               // Reset form
               setSelectedSubstance(null);
+              setSubstanceName('');
               setDate(format(new Date(), 'yyyy-MM-dd'));
               setTime(format(new Date(), 'HH:mm'));
               setAmount('');
@@ -119,6 +123,9 @@ export default function AddScreen() {
           {/* Substance Selection */}
           <View style={styles.section}>
             <Text style={styles.label}>Substance *</Text>
+            
+            {/* Quick Select Chips */}
+            <Text style={styles.sublabel}>Quick Select:</Text>
             <View style={styles.substanceGrid}>
               {substances.map((substance) => (
                 <TouchableOpacity
@@ -128,7 +135,10 @@ export default function AddScreen() {
                     selectedSubstance?.id === substance.id && styles.substanceChipSelected,
                     { borderColor: substance.color },
                   ]}
-                  onPress={() => setSelectedSubstance(substance)}
+                  onPress={() => {
+                    setSelectedSubstance(substance);
+                    setSubstanceName(substance.name);
+                  }}
                 >
                   <Text
                     style={[
@@ -142,6 +152,16 @@ export default function AddScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+            
+            {/* Editable Substance Name */}
+            <Text style={[styles.sublabel, { marginTop: 16 }]}>Or type/edit name:</Text>
+            <TextInput
+              style={styles.input}
+              value={substanceName}
+              onChangeText={setSubstanceName}
+              placeholder="Enter substance name..."
+              placeholderTextColor="#6B7280"
+            />
           </View>
 
           {/* Date and Time */}
@@ -297,6 +317,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#F9FAFB',
+    marginBottom: 8,
+  },
+  sublabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#9CA3AF',
     marginBottom: 8,
   },
   substanceGrid: {
