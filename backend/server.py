@@ -66,7 +66,10 @@ class Stats(BaseModel):
 # Substance routes
 @api_router.get("/substances", response_model=List[Substance])
 async def get_substances():
-    substances = await db.substances.find().to_list(1000)
+    substances = await db.substances.find(
+        {}, 
+        {'name': 1, 'isCustom': 1, 'color': 1}
+    ).to_list(1000)
     return [Substance(**serialize_doc(s), id=str(s["_id"])) for s in substances]
 
 @api_router.post("/substances", response_model=Substance)
@@ -89,7 +92,14 @@ async def get_entries(start_date: Optional[str] = None, end_date: Optional[str] 
     query = {}
     if start_date and end_date:
         query["date"] = {"$gte": start_date, "$lte": end_date}
-    entries = await db.entries.find(query).sort("date", -1).to_list(1000)
+    entries = await db.entries.find(
+        query,
+        {
+            'substanceId': 1, 'substanceName': 1, 'date': 1, 'time': 1,
+            'amount': 1, 'unit': 1, 'mood': 1, 'effects': 1,
+            'location': 1, 'comments': 1, 'createdAt': 1
+        }
+    ).sort("date", -1).to_list(1000)
     return [Entry(**serialize_doc(e), id=str(e["_id"])) for e in entries]
 
 @api_router.post("/entries", response_model=Entry)
@@ -121,7 +131,10 @@ async def delete_entry(entry_id: str):
 # Reminder routes
 @api_router.get("/reminders", response_model=List[Reminder])
 async def get_reminders():
-    reminders = await db.reminders.find().to_list(100)
+    reminders = await db.reminders.find(
+        {},
+        {'time': 1, 'enabled': 1, 'frequency': 1}
+    ).to_list(100)
     return [Reminder(**serialize_doc(r), id=str(r["_id"])) for r in reminders]
 
 @api_router.post("/reminders", response_model=Reminder)
@@ -153,7 +166,10 @@ async def delete_reminder(reminder_id: str):
 # Stats route
 @api_router.get("/stats")
 async def get_stats():
-    entries = await db.entries.find().to_list(10000)
+    entries = await db.entries.find(
+        {},
+        {'substanceName': 1, 'date': 1}
+    ).to_list(10000)
     
     if not entries:
         return {
@@ -182,7 +198,13 @@ async def get_stats():
 # Export route
 @api_router.get("/export/csv")
 async def export_csv():
-    entries = await db.entries.find().sort("date", -1).to_list(10000)
+    entries = await db.entries.find(
+        {},
+        {
+            'date': 1, 'time': 1, 'substanceName': 1, 'amount': 1,
+            'unit': 1, 'mood': 1, 'effects': 1, 'location': 1, 'comments': 1
+        }
+    ).sort("date", -1).to_list(10000)
     
     csv_lines = ["Date,Time,Substance,Amount,Unit,Mood,Effects,Location,Comments"]
     for entry in entries:
