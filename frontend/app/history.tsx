@@ -12,19 +12,17 @@ import {
 import { useFocusEffect } from 'expo-router';
 import { format, parseISO } from 'date-fns';
 import { Ionicons } from '@expo/vector-icons';
-
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+import { getAllEntries, deleteEntry } from '../services/database';
 
 export default function HistoryScreen() {
-  const [entries, setEntries] = useState([]);
+  const [entries, setEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [expandedEntry, setExpandedEntry] = useState(null);
+  const [expandedEntry, setExpandedEntry] = useState<number | null>(null);
 
   const fetchEntries = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/entries`);
-      const data = await response.json();
+      const data = await getAllEntries();
       setEntries(data);
     } catch (error) {
       console.error('Error fetching entries:', error);
@@ -43,7 +41,7 @@ export default function HistoryScreen() {
     fetchEntries();
   };
 
-  const handleDelete = (entryId, substanceName) => {
+  const handleDelete = (entryId: number, substanceName: string) => {
     Alert.alert(
       'Delete Entry',
       `Are you sure you want to delete this ${substanceName} entry?`,
@@ -54,14 +52,8 @@ export default function HistoryScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const response = await fetch(`${BACKEND_URL}/api/entries/${entryId}`, {
-                method: 'DELETE',
-              });
-              if (response.ok) {
-                fetchEntries();
-              } else {
-                Alert.alert('Error', 'Failed to delete entry');
-              }
+              await deleteEntry(entryId);
+              fetchEntries();
             } catch (error) {
               console.error('Error deleting entry:', error);
               Alert.alert('Error', 'Failed to delete entry');
@@ -72,12 +64,12 @@ export default function HistoryScreen() {
     );
   };
 
-  const toggleExpand = (entryId) => {
+  const toggleExpand = (entryId: number) => {
     setExpandedEntry(expandedEntry === entryId ? null : entryId);
   };
 
   const groupEntriesByDate = () => {
-    const grouped = {};
+    const grouped: { [key: string]: any[] } = {};
     entries.forEach((entry) => {
       const dateKey = entry.date;
       if (!grouped[dateKey]) {
@@ -108,7 +100,7 @@ export default function HistoryScreen() {
     >
       <View style={styles.header}>
         <Text style={styles.title}>Entry History</Text>
-        <Text style={styles.subtitle}>All your tracked entries</Text>
+        <Text style={styles.subtitle}>All your tracked entries • Stored locally</Text>
       </View>
 
       {entries.length === 0 ? (

@@ -15,8 +15,16 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+import {
+  getAllSubstances,
+  createSubstance,
+  deleteSubstance,
+  getAllReminders,
+  createReminder,
+  updateReminder,
+  deleteReminder,
+  exportToCSV,
+} from '../services/database';
 
 // Configure notification handler
 Notifications.setNotificationHandler({
@@ -28,8 +36,8 @@ Notifications.setNotificationHandler({
 });
 
 export default function SettingsScreen() {
-  const [substances, setSubstances] = useState([]);
-  const [reminders, setReminders] = useState([]);
+  const [substances, setSubstances] = useState<any[]>([]);
+  const [reminders, setReminders] = useState<any[]>([]);
   const [newSubstanceName, setNewSubstanceName] = useState('');
   const [newReminderTime, setNewReminderTime] = useState('20:00');
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
@@ -57,8 +65,7 @@ export default function SettingsScreen() {
 
   const fetchSubstances = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/substances`);
-      const data = await response.json();
+      const data = await getAllSubstances();
       setSubstances(data);
     } catch (error) {
       console.error('Error fetching substances:', error);
@@ -67,8 +74,7 @@ export default function SettingsScreen() {
 
   const fetchReminders = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/reminders`);
-      const data = await response.json();
+      const data = await getAllReminders();
       setReminders(data);
     } catch (error) {
       console.error('Error fetching reminders:', error);
@@ -82,28 +88,22 @@ export default function SettingsScreen() {
     }
 
     try {
-      const response = await fetch(`${BACKEND_URL}/api/substances`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: newSubstanceName.trim(),
-          isCustom: true,
-          color: '#8B5CF6',
-        }),
+      await createSubstance({
+        name: newSubstanceName.trim(),
+        isCustom: true,
+        color: '#8B5CF6',
       });
-
-      if (response.ok) {
-        setNewSubstanceName('');
-        fetchSubstances();
-        Alert.alert('Success', 'Substance added');
-      }
+      
+      setNewSubstanceName('');
+      fetchSubstances();
+      Alert.alert('Success', 'Substance added');
     } catch (error) {
       console.error('Error adding substance:', error);
       Alert.alert('Error', 'Failed to add substance');
     }
   };
 
-  const handleDeleteSubstance = (id, name) => {
+  const handleDeleteSubstance = (id: number, name: string) => {
     Alert.alert('Delete Substance', `Delete ${name}?`, [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -111,9 +111,7 @@ export default function SettingsScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            await fetch(`${BACKEND_URL}/api/substances/${id}`, {
-              method: 'DELETE',
-            });
+            await deleteSubstance(id);
             fetchSubstances();
           } catch (error) {
             console.error('Error deleting substance:', error);
@@ -130,29 +128,22 @@ export default function SettingsScreen() {
     }
 
     try {
-      const response = await fetch(`${BACKEND_URL}/api/reminders`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          time: newReminderTime,
-          enabled: true,
-          frequency: 'daily',
-        }),
+      const reminder = await createReminder({
+        time: newReminderTime,
+        enabled: true,
+        frequency: 'daily',
       });
-
-      if (response.ok) {
-        const reminder = await response.json();
-        await scheduleNotification(reminder);
-        fetchReminders();
-        Alert.alert('Success', 'Reminder added');
-      }
+      
+      await scheduleNotification(reminder);
+      fetchReminders();
+      Alert.alert('Success', 'Reminder added');
     } catch (error) {
       console.error('Error adding reminder:', error);
       Alert.alert('Error', 'Failed to add reminder');
     }
   };
 
-  const scheduleNotification = async (reminder) => {
+  const scheduleNotification = async (reminder: any) => {
     const [hours, minutes] = reminder.time.split(':');
     
     await Notifications.scheduleNotificationAsync({
@@ -169,21 +160,17 @@ export default function SettingsScreen() {
     });
   };
 
-  const handleToggleReminder = async (id, enabled) => {
+  const handleToggleReminder = async (id: number, enabled: boolean) => {
     try {
       const reminder = reminders.find((r) => r.id === id);
-      await fetch(`${BACKEND_URL}/api/reminders/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...reminder, enabled: !enabled }),
-      });
+      await updateReminder(id, { ...reminder, enabled: !enabled });
       fetchReminders();
     } catch (error) {
       console.error('Error toggling reminder:', error);
     }
   };
 
-  const handleDeleteReminder = (id) => {
+  const handleDeleteReminder = (id: number) => {
     Alert.alert('Delete Reminder', 'Remove this reminder?', [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -191,9 +178,7 @@ export default function SettingsScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            await fetch(`${BACKEND_URL}/api/reminders/${id}`, {
-              method: 'DELETE',
-            });
+            await deleteReminder(id);
             fetchReminders();
           } catch (error) {
             console.error('Error deleting reminder:', error);
@@ -205,11 +190,10 @@ export default function SettingsScreen() {
 
   const handleExportCSV = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/export/csv`);
-      const data = await response.json();
+      const csvData = await exportToCSV();
       
       const fileUri = FileSystem.documentDirectory + 'substance_tracker_export.csv';
-      await FileSystem.writeAsStringAsync(fileUri, data.data);
+      await FileSystem.writeAsStringAsync(fileUri, csvData);
       
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(fileUri);
@@ -222,24 +206,11 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleInitializeData = async () => {
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/initialize`, {
-        method: 'POST',
-      });
-      const data = await response.json();
-      Alert.alert('Success', data.message);
-      fetchSubstances();
-    } catch (error) {
-      console.error('Error initializing data:', error);
-    }
-  };
-
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Settings</Text>
-        <Text style={styles.subtitle}>Customize your tracking</Text>
+        <Text style={styles.subtitle}>Customize your tracking • Offline storage</Text>
       </View>
 
       {/* Manage Substances */}
@@ -267,13 +238,13 @@ export default function SettingsScreen() {
                   style={[styles.colorDot, { backgroundColor: substance.color }]}
                 />
                 <Text style={styles.substanceName}>{substance.name}</Text>
-                {substance.isCustom && (
+                {substance.isCustom === 1 && (
                   <View style={styles.customBadge}>
                     <Text style={styles.customBadgeText}>Custom</Text>
                   </View>
                 )}
               </View>
-              {substance.isCustom && (
+              {substance.isCustom === 1 && (
                 <TouchableOpacity
                   onPress={() => handleDeleteSubstance(substance.id, substance.name)}
                 >
@@ -283,10 +254,6 @@ export default function SettingsScreen() {
             </View>
           ))}
         </View>
-
-        <TouchableOpacity style={styles.initButton} onPress={handleInitializeData}>
-          <Text style={styles.initButtonText}>Initialize Default Substances</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Reminders */}
@@ -329,8 +296,8 @@ export default function SettingsScreen() {
               </View>
               <View style={styles.reminderActions}>
                 <Switch
-                  value={reminder.enabled}
-                  onValueChange={() => handleToggleReminder(reminder.id, reminder.enabled)}
+                  value={reminder.enabled === 1}
+                  onValueChange={() => handleToggleReminder(reminder.id, reminder.enabled === 1)}
                   trackColor={{ false: '#374151', true: '#8B5CF6' }}
                   thumbColor="#FFFFFF"
                 />
@@ -356,8 +323,9 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>About</Text>
         <View style={styles.infoCard}>
-          <Text style={styles.infoText}>Substance Use Tracker v1.0</Text>
+          <Text style={styles.infoText}>Substance Use Tracker v2.0</Text>
           <Text style={styles.infoSubtext}>Track, analyze, and improve your habits</Text>
+          <Text style={styles.infoSubtext}>100% Offline • Local SQLite Storage</Text>
         </View>
       </View>
     </ScrollView>
@@ -457,18 +425,6 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     fontWeight: '600',
   },
-  initButton: {
-    backgroundColor: '#374151',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  initButtonText: {
-    fontSize: 14,
-    color: '#9CA3AF',
-    fontWeight: '600',
-  },
   warningCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -541,5 +497,6 @@ const styles = StyleSheet.create({
   infoSubtext: {
     fontSize: 14,
     color: '#9CA3AF',
+    marginTop: 4,
   },
 });

@@ -13,15 +13,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { useRouter } from 'expo-router';
-
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+import { getAllSubstances, createEntry } from '../services/database';
 
 const UNITS = ['mg', 'g', 'ml', 'pills', 'drops', 'puffs', 'doses', 'other'];
 
 export default function AddScreen() {
   const router = useRouter();
-  const [substances, setSubstances] = useState([]);
-  const [selectedSubstance, setSelectedSubstance] = useState(null);
+  const [substances, setSubstances] = useState<any[]>([]);
+  const [selectedSubstance, setSelectedSubstance] = useState<any>(null);
   const [substanceName, setSubstanceName] = useState('');
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [time, setTime] = useState(format(new Date(), 'HH:mm'));
@@ -39,8 +38,7 @@ export default function AddScreen() {
 
   const fetchSubstances = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/substances`);
-      const data = await response.json();
+      const data = await getAllSubstances();
       setSubstances(data);
     } catch (error) {
       console.error('Error fetching substances:', error);
@@ -74,37 +72,27 @@ export default function AddScreen() {
         comments,
       };
 
-      const response = await fetch(`${BACKEND_URL}/api/entries`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(entry),
-      });
-
-      if (response.ok) {
-        Alert.alert('Success', 'Entry added successfully', [
-          {
-            text: 'OK',
-            onPress: () => {
-              // Reset form
-              setSelectedSubstance(null);
-              setSubstanceName('');
-              setDate(format(new Date(), 'yyyy-MM-dd'));
-              setTime(format(new Date(), 'HH:mm'));
-              setAmount('');
-              setUnit('g');
-              setMood('');
-              setEffects('');
-              setLocation('');
-              setComments('');
-              router.push('/');
-            },
+      await createEntry(entry);
+      
+      Alert.alert('Success', 'Entry added successfully', [
+        {
+          text: 'OK',
+          onPress: () => {
+            // Reset form
+            setSelectedSubstance(null);
+            setSubstanceName('');
+            setDate(format(new Date(), 'yyyy-MM-dd'));
+            setTime(format(new Date(), 'HH:mm'));
+            setAmount('');
+            setUnit('g');
+            setMood('');
+            setEffects('');
+            setLocation('');
+            setComments('');
+            router.push('/');
           },
-        ]);
-      } else {
-        Alert.alert('Error', 'Failed to add entry');
-      }
+        },
+      ]);
     } catch (error) {
       console.error('Error adding entry:', error);
       Alert.alert('Error', 'Failed to add entry');

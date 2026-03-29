@@ -11,24 +11,20 @@ import {
 import { useFocusEffect } from 'expo-router';
 import { format, parseISO, startOfWeek, addDays, subWeeks } from 'date-fns';
 import { LineChart, BarChart } from 'react-native-gifted-charts';
+import { getAllEntries, getStats } from '../services/database';
 
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 const screenWidth = Dimensions.get('window').width;
 
 export default function TrendsScreen() {
-  const [entries, setEntries] = useState([]);
-  const [stats, setStats] = useState(null);
+  const [entries, setEntries] = useState<any[]>([]);
+  const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchData = async () => {
     try {
-      const [entriesRes, statsRes] = await Promise.all([
-        fetch(`${BACKEND_URL}/api/entries`),
-        fetch(`${BACKEND_URL}/api/stats`),
-      ]);
-      const entriesData = await entriesRes.json();
-      const statsData = await statsRes.json();
+      const entriesData = await getAllEntries();
+      const statsData = await getStats();
       setEntries(entriesData);
       setStats(statsData);
     } catch (error) {
@@ -79,7 +75,7 @@ export default function TrendsScreen() {
     
     return Object.entries(stats.substanceBreakdown).map(([name, count], index) => ({
       label: name.length > 10 ? name.substring(0, 10) + '...' : name,
-      value: count,
+      value: count as number,
       frontColor: colors[index % colors.length],
     }));
   };
@@ -125,7 +121,7 @@ export default function TrendsScreen() {
     >
       <View style={styles.header}>
         <Text style={styles.title}>Trends & Analytics</Text>
-        <Text style={styles.subtitle}>Visualize your patterns</Text>
+        <Text style={styles.subtitle}>Visualize your patterns • Local data</Text>
       </View>
 
       {/* Statistics Cards */}
