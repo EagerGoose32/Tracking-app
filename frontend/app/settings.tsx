@@ -9,12 +9,15 @@ import {
   Alert,
   Switch,
   Platform,
+  Linking,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import * as SQLite from 'expo-sqlite';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   getAllSubstances,
   createSubstance,
@@ -25,6 +28,8 @@ import {
   deleteReminder,
   exportToCSV,
 } from '../services/database';
+
+const DB_NAME = 'substanceTracker.db';
 
 // Configure notification handler
 Notifications.setNotificationHandler({
@@ -54,12 +59,12 @@ export default function SettingsScreen() {
   const requestNotificationPermissions = async () => {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
-    
+
     if (existingStatus !== 'granted') {
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
     }
-    
+
     setNotificationsEnabled(finalStatus === 'granted');
   };
 
@@ -93,7 +98,7 @@ export default function SettingsScreen() {
         isCustom: true,
         color: '#8B5CF6',
       });
-      
+
       setNewSubstanceName('');
       fetchSubstances();
       Alert.alert('Success', 'Substance added');
@@ -133,7 +138,7 @@ export default function SettingsScreen() {
         enabled: true,
         frequency: 'daily',
       });
-      
+
       await scheduleNotification(reminder);
       fetchReminders();
       Alert.alert('Success', 'Reminder added');
@@ -145,7 +150,7 @@ export default function SettingsScreen() {
 
   const scheduleNotification = async (reminder: any) => {
     const [hours, minutes] = reminder.time.split(':');
-    
+
     await Notifications.scheduleNotificationAsync({
       content: {
         title: 'Track Your Usage',
@@ -191,10 +196,10 @@ export default function SettingsScreen() {
   const handleExportCSV = async () => {
     try {
       const csvData = await exportToCSV();
-      
+
       const fileUri = FileSystem.documentDirectory + 'substance_tracker_export.csv';
       await FileSystem.writeAsStringAsync(fileUri, csvData);
-      
+
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(fileUri);
       } else {
@@ -204,6 +209,47 @@ export default function SettingsScreen() {
       console.error('Error exporting:', error);
       Alert.alert('Error', 'Failed to export data');
     }
+  };
+
+  const handleDestroyData = () => {
+    Alert.alert(
+      'Permanently Destroy All Data?',
+      'This will:\n• Delete all substance logs\n• Clear all settings\n• Remove all stored data\n\nThis cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Yes, Destroy Everything',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // 1. Drop all SQLite tables
+              const db = await SQLite.openDatabaseAsync(DB_NAME);
+              await db.execAsync(`
+                PRAGMA writable_schema = 1;
+                DELETE FROM sqlite_master WHERE type IN ('table', 'index', 'trigger');
+                PRAGMA writable_schema = 0;
+                VACUUM;
+              `);
+              await db.closeAsync();
+
+              // 2. Clear AsyncStorage
+              await AsyncStorage.clear();
+
+              // 3. Clear cache
+              if (FileSystem.cacheDirectory) {
+                await FileSystem.deleteAsync(FileSystem.cacheDirectory, { idempotent: true });
+              }
+
+              // 4. Send to app settings to uninstall
+              Linking.openSettings();
+
+            } catch (e: any) {
+              Alert.alert('Error', `Failed to clear data: ${e.message}`);
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -216,7 +262,7 @@ export default function SettingsScreen() {
       {/* Manage Substances */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Manage Substances</Text>
-        
+
         <View style={styles.addRow}>
           <TextInput
             style={styles.input}
@@ -234,9 +280,7 @@ export default function SettingsScreen() {
           {substances.map((substance) => (
             <View key={substance.id} style={styles.substanceItem}>
               <View style={styles.substanceInfo}>
-                <View
-                  style={[styles.colorDot, { backgroundColor: substance.color }]}
-                />
+                <View style={[styles.colorDot, { backgroundColor: substance.color }]} />
                 <Text style={styles.substanceName}>{substance.name}</Text>
                 {substance.isCustom === 1 && (
                   <View style={styles.customBadge}>
@@ -259,13 +303,11 @@ export default function SettingsScreen() {
       {/* Reminders */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Tracking Reminders</Text>
-        
+
         {!notificationsEnabled && (
           <View style={styles.warningCard}>
             <Ionicons name="warning-outline" size={20} color="#F59E0B" />
-            <Text style={styles.warningText}>
-              Enable notifications to use reminders
-            </Text>
+            <Text style={styles.warningText}>Enable notifications to use reminders</Text>
           </View>
         )}
 
@@ -328,6 +370,16 @@ export default function SettingsScreen() {
           <Text style={styles.infoSubtext}>100% Offline • Local SQLite Storage</Text>
         </View>
       </View>
+
+      {/* Danger Zone */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Danger Zone</Text>
+        <TouchableOpacity style={styles.destroyButton} onPress={handleDestroyData}>
+          <Ionicons name="nuclear-outline" size={20} color="#FFFFFF" />
+          <Text style={styles.destroyButtonText}>Destroy All Data & Uninstall</Text>
+        </TouchableOpacity>
+      </View>
+
     </ScrollView>
   );
 }
@@ -498,5 +550,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#9CA3AF',
     marginTop: 4,
+  },
+  destroyButton: {
+    flexDirection: 'row',
+    backgroundColor: '#EF4444',
+    padding: 16,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  destroyButtonText: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
 });
