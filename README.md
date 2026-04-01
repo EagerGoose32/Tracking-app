@@ -1,1 +1,1 @@
-App name is Lumen, its a substance and medication intake app
+App name is Lumen, its a substance and medication intake app, currently broken currently state
